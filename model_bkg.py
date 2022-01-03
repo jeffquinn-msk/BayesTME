@@ -21,7 +21,7 @@ def transition_mat(phi, n_max, coeff, ifsigma=False):
     return T
 
 class GraphFusedMultinomial:
-    def __init__(self, n_components, edges, Observations, n_gene=300, n_max=120, background_noise=False, random_seed=0,
+    def __init__(self, n_components, edges, Observations, n_gene=300, n_max=120, background_noise=False, random_seed=0, mask=None,
                     c=4, D=30, tf_order_psi=0, lam_psi=1e-2, lda_initialization=False, known_cell_num=None, known_spots=None,
                     Truth_expression=None, Truth_prob=None, Truth_cellnum=None, Truth_reads=None, Truth_beta=None, **kwargs):
         np.random.seed(random_seed)
@@ -32,7 +32,7 @@ class GraphFusedMultinomial:
         self.bkg = background_noise
         self.HMM = HMM(self.n_components, self.n_max)
         self.gtf_psi = GraphFusedBinomialTree(self.n_components+1, edges, lam2=lam_psi)
-
+        self.mask = mask
         self.n_nodes = self.gtf_psi.n_nodes
 
         # initialize cell-type probs
@@ -73,10 +73,13 @@ class GraphFusedMultinomial:
             else:
                 self.cell_num[:, 1:] = utils.multinomial_rvs(self.cell_num[:, 0], p=self.probs[:, 1:])
 
-        spot_count = Observations.sum(axis=1)
+        if mask is not None:
+            spot_count = Observations[~mask].sum(axis=1)
+        else:
+            spot_count = Observations.sum(axis=1)
         mu = spot_count.sum() / (self.n_nodes * D)
-        L = spot_count.min() / D
-        U = spot_count.max() / D
+        L = np.percentile(spot_count, 5) / D
+        U = np.percentile(spot_count, 95) / D
         s = max(mu-L, U-mu)
         self.a_beta = c ** 2 * mu ** 2 / s ** 2
         self.b_beta = c ** 2 * mu / s ** 2
@@ -90,7 +93,6 @@ class GraphFusedMultinomial:
         if Truth_reads is not None:
             self.reads = Truth_reads
 
-        self.binomial_coeff = np.array([[scs.binom(n, k) for k in range(n+1)] for n in range(self.n_max+1)])
         # get the transition matrices
         self.Transition = np.zeros((self.n_nodes, self.n_components-1, self.n_max+1, self.n_max+1))
         self.expression = self.beta[:, None] * self.phi
@@ -147,6 +149,8 @@ class GraphFusedMultinomial:
             cell_num = self.cell_num.copy()
         cell_num[:, 0] = self.n_max - cell_num[:, 0]
         # GFTB sampling
+        if self.mask is not None:
+            cell_num[self.mask] = 0
         self.gtf_psi.resample(cell_num)
         # clean up the cell-type prob
         self.probs = self.gtf_psi.probs
@@ -195,4 +199,5 @@ class GraphFusedMultinomial:
         np.save(save_dir+'checkpoint_Tau2_a', self.gtf_psi.Tau2_a)
         np.save(save_dir+'checkpoint_Tau2_b', self.gtf_psi.Tau2_b)
         np.save(save_dir+'checkpoint_Tau2_c', self.gtf_psi.Tau2_c)
+
 
