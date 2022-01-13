@@ -1,5 +1,5 @@
 import numpy as np
-from model_bkg import GraphFusedMultinomial
+# from model_bkg import GraphFusedMultinomial
 from scipy.stats import multinomial
 import utils
 import matplotlib.pyplot as plt
@@ -8,11 +8,16 @@ import pandas as pd
 import scipy.io as io
 
 class BayesTME:
-    def __init__(self, exp_name='BayesTME'):
+    def __init__(self, exp_name='BayesTME', storage_path=None):
         # set up experiment name
         self.exp_name = exp_name
+        # set storage path of all generated results
+        if storage_path:
+            self.storage_path = storage_path
+        else:
+            self.storage_path = exp_name+'_results'
 
-    def load_from_spaceranger(self, data_path, layout=1):
+    def load_data_from_spaceranger(self, data_path, layout=1):
         '''
         Load data from spaceranger /outputs folder
         Inputs:
@@ -23,6 +28,8 @@ class BayesTME:
             layout:     Visim(hex)  1
                         ST(square)  2
         '''
+        if data_path[-1] != '/':
+            data_path += '/'
         raw_count_path = data_path + 'raw_feature_bc_matrix/matrix.mtx.gz'
         filtered_count_path = data_path + 'filtered_feature_bc_matrix/matrix.mtx.gz'
         features_path = data_path + 'raw_feature_bc_matrix/features.tsv.gz'
@@ -35,7 +42,7 @@ class BayesTME:
             positions_list = pd.read_csv(positions_path+'.txt', sep=',', header=None, index_col=0, names=None)
         raw_count = np.array(io.mmread(raw_count_path).todense())
         filtered_count = np.array(io.mmread(filtered_count_path).todense())
-        features = pd.read_csv(features_path, header=None, sep='\t')
+        features = np.array(pd.read_csv(features_path, header=None, sep='\t'))[:, 1].astype(str)
         barcodes = pd.read_csv(barcodes_path, header=None, sep='\t')
         # positions_list = pd.read_csv(positions_path, header=None, index_col=0, names=None)
         n_spots = raw_count.shape[1]
@@ -52,8 +59,33 @@ class BayesTME:
         all_counts = raw_count.sum()
         tissue_counts = filtered_count.sum()
         print('\t {:.3f}% UMI counts bleeds out'.format((1 - tissue_counts/all_counts) * 100))
+        return RawSTData(data_name=self.exp_name, raw_count=raw_count.T, positions=positions.T, tissue_mask=tissue_mask, gene_names=features, 
+                            layout=layout, storage_path=self.storage_path)
 
-        return RawSTData(raw_count.T, filtered_count.T, tissue_mask, positions_tissue, positions, features, layout, self.exp_name)
+    def load_data_from_count_mat(self, data_path, layout=2):
+        '''
+        Load data from tsv count matrix containing only in-tissue spots where the count matrix is a tsv file of shape G by N
+        the column names and row names are position and gene names respectively
+        Inputs:
+            data_path:  /path/to/count_matrix
+            layout:     Visim(hex)  1
+                        ST(square)  2
+        '''
+        raw_data = pd.read_csv(data_path, sep='\t')
+        count_mat = raw_data.values[:, 1:].T.astype(int)
+        features = np.array([x.split(' ')[0] for x in raw_data.values[:, 0]])
+        n_spots = count_mat.shape[0]
+        n_genes = count_mat.shape[1]
+        print('detected {} spots, {} genes'.format(n_spots, n_genes))
+        positions = np.zeros((2, n_spots))
+        for i in range(n_spots):
+            spot_pos = raw_data.columns[1:][i].split('x')
+            positions[0, i] = int(spot_pos[0])
+            positions[1, i] = int(spot_pos[1])
+        positions = positions.astype(int)
+        tissue_mask = np.ones(n_spots).astype(bool)
+        return RawSTData(data_name=self.exp_name, raw_count=count_mat, positions=positions, tissue_mask=tissue_mask, gene_names=features, 
+                            layout=layout, storage_path=self.storage_path)
 
     def cleaning_data(self, RawSTData):
         '''
@@ -68,7 +100,8 @@ class BayesTME:
         '''
         return CrossValidationSTData(STData, n_folds)
 
-    def deconvolve(self, STData, n_gene=None, n_components=None, lam2=None, n_samples=100, n_burnin=1000, n_thin=10, random_seed=0, bkg=False, lda=False, cv=False, save_trace=False):
+    def deconvolve(self, STData, n_gene=None, n_components=None, lam2=None, n_samples=100, n_burnin=1000, n_thin=10, 
+                    random_seed=0, bkg=False, lda=False, cv=False, save_trace=False, max_ncell=120):
         '''
 
         Inputs:
@@ -100,6 +133,10 @@ class BayesTME:
         # load position, and spatial layout
         self.pos = STData.positions_tissue
         self.layout = STData.layout
+        if self.layout == 1:
+            spatial = 'Visim(hex)'
+        else:
+            spatial = 'ST(square)'
         # generate edge graph from spot positions and ST layout
         self.edges = utils.get_edges(self.pos, self.layout)
         self.n_components = n_components
@@ -114,12 +151,12 @@ class BayesTME:
         elif isinstance(n_gene, (list, np.ndarray)):
             self.n_gene = len(n_gene)
             Observation = STData.Reads[:, n_gene]
-        elif isinstance(n_gene, int) and n_gene <= STData.Reads.shape[1]:
-            self.n_gene = n_gene
+        elif isinstance(n_gene, int):
+            self.n_gene = min(n_gene, STData.Reads.shape[1])
             top = np.argsort(np.std(np.log(1+STData.Reads), axis=0))[::-1]
             Observation = STData.Reads[:, top[:self.n_gene]]
         else:
-            raise ValueException('n_gene must be a integer less or equal to total number of gene ({}) or a list of indices of genes'.format(Observation.shape[1]))
+            raise ValueException('n_gene must be a integer or a list of indices of genes')
 
         np.random.seed(random_seed)
 
@@ -132,6 +169,12 @@ class BayesTME:
             self.lam2 = lam2
         else:
             raise Exception('use cv to determine spatial smoothing parameter')
+
+        print('experiment: {}, lambda {}, {} components'.format(self.exp_name, lam2, n_components))
+        print('\t {} lda, {} layout, {} max cells, {}({}) gene'.format(lda, spatial, max_ncell, self.n_gene, n_gene))
+        print('sampling: {} burn_in, {} samples, {} thinning'.format(n_burnin, n_samples, n_thin))
+        print('storage: {}'.format(self.storage_path))
+
         gfm = GraphFusedMultinomial(n_components=n_components, edges=self.edges, Observations=Observation, n_gene=self.n_gene, lam_psi=self.lam2, 
                                     background_noise=bkg, lda_initialization=lda)
 
@@ -164,15 +207,14 @@ class BayesTME:
                     loglhtest_trace[idx] = multinomial.logpmf(test.flatten(), test.sum(), nb_probs.flatten())
                 loglhtrain_trace[idx] = multinomial.logpmf(Observation.flatten(), Observation.sum(), nb_probs.flatten())
                 # print('{}'.format(loglhtrain_trace[idx]))
-        print('Done')
-        if save_trace:
-            np.save('results/{}_cell_prob_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam_psi), cell_prob_trace)
-            np.save('results/{}_phi_post_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam_psi), expression_trace)
-            np.save('results/{}_beta_post_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam_psi), beta_trace)
-            # np.save('results/{}_cell_num_{}_{}_{}_lda{}.npy'.format(args.exp_name, args.n_components, args.lam_psi, args.n_fold, args.lda), cell_num_trace)
-            np.save('results/{}_train_likelihood_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam_psi), loglhtrain_trace)
-            np.save('results/{}_test_likelihood_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam_psi), loglhtest_trace)
-        return DeconvolvedSTData(Observation, self.pos, STData.features, self.layout, self.exp_name, cell_prob_trace, expression_trace, beta_trace, cell_num_trace, self.lam2)
+        print(f'Step {step+1}/{total_samples} finished!')
+        np.save(self.storage_path+'{}_cell_prob_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), cell_prob_trace)
+        np.save(self.storage_path+'{}_phi_post_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), expression_trace)
+        np.save(self.storage_path+'{}_beta_post_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), beta_trace)
+        np.save(self.storage_path+'{}_train_likelihood_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), loglhtrain_trace)
+        if cv:
+            np.save(self.storage_path+'{}_test_likelihood_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), loglhtest_trace)
+        return DeconvolvedSTData(Observation, self.pos, STData.gene_names, self.layout, self.exp_name, cell_prob_trace, expression_trace, beta_trace, cell_num_trace, self.lam2)
 
 
     def spatial_expression(self):

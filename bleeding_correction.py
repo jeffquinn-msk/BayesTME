@@ -63,11 +63,11 @@ def test_build_basic_indices():
 
     basis_idxs, basis_mask = build_basis_indices(locations)
 
-    for idx, loc in enumerate(locations):
-        print(f'Location {loc}')
-        print(basis_idxs[idx])
-        print(basis_mask[idx])
-        print()
+    # for idx, loc in enumerate(locations):
+    #     print(f'Location {loc}')
+    #     print(basis_idxs[idx])
+    #     print(basis_mask[idx])
+    #     print()
 
 def softplus(x):
     return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0)
@@ -100,7 +100,7 @@ def fit_basis_functions(Reads, tissue_mask, Rates, global_rates, basis_idxs, bas
         x_init = np.full(basis_shape, -3)
         # x_init = (np.median(Reads, axis=0), )
         # x_init = np.concatenate([x_init[0], x_init[1].reshape(-1)])
-        print(x_init)
+        # print(x_init)
     
 
     def loss(t_Betas):
@@ -123,10 +123,10 @@ def fit_basis_functions(Reads, tissue_mask, Rates, global_rates, basis_idxs, bas
         # Rate for each spot is bleed prob * spot rate plus the global read prob
         t_Mu = (t_Rates[None] * t_Weights[...,None]).sum(dim=1) + t_Beta0[None]
         
-        print(t_Basis[0,:15])
-        print(t_Basis[1,:15])
-        print(t_Basis[2,:15])
-        print(t_Basis[3,:15])
+        # print(t_Basis[0,:15])
+        # print(t_Basis[1,:15])
+        # print(t_Basis[2,:15])
+        # print(t_Basis[3,:15])
         
         # Calculate the negative log-likelihood of the data
         L = -torch.stack([Multinomial(total_count=int(N[i]), probs=t_Mu[:,i]).log_prob(t_Y[i]) for i in range(Reads.shape[1])], dim=0).mean()
@@ -135,13 +135,13 @@ def fit_basis_functions(Reads, tissue_mask, Rates, global_rates, basis_idxs, bas
             # Apply a fused lasso penalty to enforce piecewise linear curves
             L += lam * (t_Betas[:,1:] - t_Betas[:,:-1]).abs().mean()
 
-        print('Before L2:', L)
+        # print('Before L2:', L)
         # Add a tiny bit of ridge penalty
         L += 1e-1*(t_Basis**2).sum()
-        print('After L2:', L)
+        # print('After L2:', L)
 
         return L
-
+    
     # Optimize using a 2nd order method with autograd for gradient calculation. Amazing times we live in.
     res = minimize(loss, x_init, method='L-BFGS-B', backend='torch')
 
@@ -214,9 +214,9 @@ def fit_spot_rates(Reads, tissue_mask, Weights, x_init=None):
         # Calculate the negative log-likelihood of the data
         L = -torch.stack([Multinomial(total_count=int(N[i]), probs=Mu[:,i]).log_prob(t_Y[i]) for i in range(Reads.shape[1])], dim=0).mean()
 
-        print(Mu.data.numpy()[tissue_mask][:10])
-        print(t_Beta0)
-        print(L)
+        # print(Mu.data.numpy()[tissue_mask][:10])
+        # print(t_Beta0)
+        # print(L)
 
         return L
 
