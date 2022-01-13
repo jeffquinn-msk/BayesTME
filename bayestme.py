@@ -1,5 +1,5 @@
 import numpy as np
-# from model_bkg import GraphFusedMultinomial
+from model_bkg import GraphFusedMultinomial
 from scipy.stats import multinomial
 import utils
 import matplotlib.pyplot as plt
