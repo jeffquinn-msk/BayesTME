@@ -183,7 +183,7 @@ class BayesTME:
         cell_num_trace = np.zeros((n_samples, self.n_nodes, self.n_components+1))
         expression_trace = np.zeros((n_samples, self.n_components, self.n_gene))
         beta_trace = np.zeros((n_samples, self.n_components))
-        # reads_trace = np.zeros((n_samples, n_nodes, n_gene, n_components))
+        reads_trace = np.zeros((n_samples, self.n_nodes, self.n_gene, self.n_components))
         if cv:
             loglhtest_trace = np.zeros(n_samples)
         loglhtrain_trace = np.zeros(n_samples)
@@ -199,22 +199,12 @@ class BayesTME:
                 expression_trace[idx] = gfm.phi
                 beta_trace[idx] = gfm.beta
                 cell_num_trace[idx] = gfm.cell_num
-                # reads_trace[idx] = gfnb.reads[:, :, :-1]
-                # save_npz('results/{}_reads_{}_{}_{}_{}'.format(args.exp_name, idx, args.n_components, args.n_gene, args.n_fold), csc_matrix(gfnb.reads[:, :, :-1].reshape(n_nodes, -1)))
-                rates = (gfm.cell_num[:, 1:][:, :, None] * (gfm.beta[:, None] * gfm.phi)[None])
-                nb_probs = rates.sum(axis=1) / rates.sum()
-                if cv:
-                    loglhtest_trace[idx] = multinomial.logpmf(test.flatten(), test.sum(), nb_probs.flatten())
-                loglhtrain_trace[idx] = multinomial.logpmf(Observation.flatten(), Observation.sum(), nb_probs.flatten())
-                # print('{}'.format(loglhtrain_trace[idx]))
+                reads_trace[idx] = gfm.reads
+                
         print(f'Step {step+1}/{total_samples} finished!')
-        np.save(self.storage_path+'{}_cell_prob_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), cell_prob_trace)
-        np.save(self.storage_path+'{}_phi_post_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), expression_trace)
-        np.save(self.storage_path+'{}_beta_post_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), beta_trace)
-        np.save(self.storage_path+'{}_train_likelihood_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), loglhtrain_trace)
-        if cv:
-            np.save(self.storage_path+'{}_test_likelihood_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), loglhtest_trace)
-        return DeconvolvedSTData(Observation, self.pos, STData.gene_names, self.layout, self.exp_name, cell_prob_trace, expression_trace, beta_trace, cell_num_trace, self.lam2)
+        np.save(self.storage_path+'{}_reads_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), reads_trace)
+
+        return DeconvolvedSTData(stdata=STData, cell_prob_trace=cell_prob_trace, expression_trace=expression_trace, beta_trace=beta_trace, cell_num_trace=cell_num_trace, lam=self.lam2)
 
 
     def spatial_expression(self):
