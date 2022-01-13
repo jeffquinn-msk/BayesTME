@@ -87,18 +87,18 @@ class BayesTME:
         return RawSTData(data_name=self.exp_name, raw_count=count_mat, positions=positions, tissue_mask=tissue_mask, gene_names=features, 
                             layout=layout, storage_path=self.storage_path)
 
-    def cleaning_data(self, RawSTData):
+    def cleaning_data(self, stdata, n_top=50, max_steps=5, n_gene=None):
         '''
 
         '''
-        return CleanedSTData(RawSTData.raw_count, RawSTData.Reads, RawSTData.tissue_mask, RawSTData.positions_tissue, RawSTData.positions, RawSTData.features, RawSTData.layout, RawSTData.data_name)
+        return stdata.bleeding_correction(n_top, max_steps, n_gene)
 
-    def hyperparam_auto_tuning(self, STData, n_folds):
+    def kfold(self, stdata, cluster_storage, n_fold=5, n_splits=15, n_samples=100, n_burn=2000, n_thin=5, lda=0):
         '''
         Auto-tuning 1) number of cell-types         K
                     2) spatial smoothing parameter  lam
         '''
-        return CrossValidationSTData(STData, n_folds)
+        return stdata.k_fold(cluster_storage, n_fold, n_split, n_samples, n_burn, n_thin, lda)
 
     def deconvolve(self, STData, n_gene=None, n_components=None, lam2=None, n_samples=100, n_burnin=1000, n_thin=10, 
                     random_seed=0, bkg=False, lda=False, cv=False, save_trace=False, max_ncell=120):
