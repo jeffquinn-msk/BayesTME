@@ -3,7 +3,7 @@ from model_bkg import GraphFusedMultinomial
 from scipy.stats import multinomial
 import utils
 import matplotlib.pyplot as plt
-from bayestme_data import RawSTData, CleanedSTData, DeconvolvedSTData
+from bayestme_data import RawSTData, CleanedSTData, DeconvolvedSTData, SpatialExpression
 import pandas as pd
 import scipy.io as io
 
@@ -15,7 +15,7 @@ class BayesTME:
         if storage_path:
             self.storage_path = storage_path
         else:
-            self.storage_path = exp_name+'_results'
+            self.storage_path = exp_name+'_results/'
 
     def load_data_from_spaceranger(self, data_path, layout=1):
         '''
@@ -169,11 +169,11 @@ class BayesTME:
             self.lam2 = lam2
         else:
             raise Exception('use cv to determine spatial smoothing parameter')
-
+        results_path = self.storage_path+'results/'
         print('experiment: {}, lambda {}, {} components'.format(self.exp_name, lam2, n_components))
         print('\t {} lda, {} layout, {} max cells, {}({}) gene'.format(lda, spatial, max_ncell, self.n_gene, n_gene))
         print('sampling: {} burn_in, {} samples, {} thinning'.format(n_burnin, n_samples, n_thin))
-        print('storage: {}'.format(self.storage_path))
+        print('storage: {}'.format(results_path))
 
         gfm = GraphFusedMultinomial(n_components=n_components, edges=self.edges, Observations=Observation, n_gene=self.n_gene, lam_psi=self.lam2, 
                                     background_noise=bkg, lda_initialization=lda)
@@ -202,12 +202,13 @@ class BayesTME:
                 reads_trace[idx] = gfm.reads
                 
         print(f'Step {step+1}/{total_samples} finished!')
-        np.save(self.storage_path+'{}_reads_{}_{}.npy'.format(self.exp_name, self.n_components, self.lam2), reads_trace)
+        np.save(results_path+'reads_trace.npy'.format(self.exp_name, self.n_components, self.lam2), reads_trace)
 
         return DeconvolvedSTData(stdata=STData, cell_prob_trace=cell_prob_trace, expression_trace=expression_trace, beta_trace=beta_trace, cell_num_trace=cell_num_trace, lam=self.lam2)
 
 
-    def spatial_expression(self):
-        pass
+    def spatial_expression(self, DecovolvedData, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5):
+        return SpatialExpression(stdata=DecovolvedData, n_spatial_patterns=n_spatial_patterns, n_samples=n_samples, 
+                                    n_burn=n_burn, n_thin=n_thin)
 
 

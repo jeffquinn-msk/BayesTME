@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import bayestme_plot as bp
 import bleeding_correction as bleed
+from spatial_expression import SpatialDifferentialExpression
 import re
 import os
 import warnings
@@ -42,15 +43,16 @@ class RawSTData:
             np.save(storage_path+'raw_count.npy', raw_count)
             np.save(storage_path+'all_spots_position.npy', positions)
 
-            # get gene reads and spatial coordinates of in-tissue spots
-            self.Reads = raw_count[tissue_mask]
-            self.positions_tissue = positions[:, tissue_mask].astype(int)
-
-            # set up other parameters
+            # set up basic parameters
             self.tissue_mask = tissue_mask
             self.gene_names = gene_names
             self.layout = layout
             self.storage_path = storage_path
+
+            # get gene reads and spatial coordinates of in-tissue spots
+            self.Reads = raw_count[tissue_mask]
+            self.positions_tissue = positions[:, tissue_mask].astype(int)
+            self.edges = utils.get_edges(self.positions_tissue, layout=self.layout)
 
             # set up plotting parameter
             self.x_y_swap = x_y_swap
@@ -138,6 +140,7 @@ class RawSTData:
         np.save(self.storage_path+'tissue_mask', self.tissue_mask)
         np.save(self.storage_path+'gene_names', self.gene_names)
         np.save(self.storage_path+'Reads', self.Reads)
+        np.save(self.storage_path+'edges', self.edges)
         params = np.array([self.layout, self.x_y_swap, self.invert[0], self.invert[1]])
         np.save(self.storage_path+'param', params)
         np.save(self.storage_path+'filtering', self.filtering)
@@ -164,7 +167,7 @@ class RawSTData:
 
         self.Reads = np.load(load_path+'Reads.npy')
         self.positions_tissue = positions[:, tissue_mask].astype(int)
-
+        self.edges = np.load(load_path+'edges.npy')
         # set up other parameters
         self.tissue_mask = tissue_mask
         self.gene_names = gene_names
@@ -316,6 +319,9 @@ class DeconvolvedSTData(RawSTData):
     def __init__(self, load_path=None, stdata=None, cell_prob_trace=None, expression_trace=None, beta_trace=None, 
                     cell_num_trace=None, lam=None):
         super().__init__(stdata.data_name, load=stdata.storage_path)
+        self.results_path = self.storage_path+'results/'
+        if not os.path.isdir(self.results_path):
+            os.mkdir(self.results_path)
         if load_path:
             self.load_deconvolved(load_path)
         else:
@@ -325,7 +331,7 @@ class DeconvolvedSTData(RawSTData):
             self.cell_num_trace = cell_num_trace
             self.lam = lam
             self.n_components = self.expression_trace.shape[1]
-            self.save()
+            self.save_deconvolved()
 
     def detect_communities(self, min_clusters, max_clusters, assignments_ref=None, alignment=False):
         best_clusters, best_assignments, scores = communities_from_posteriors(self.cell_prob_trace[:, :, 1:], self.edges, min_clusters=min_clusters, max_clusters=max_clusters, cluster_score=gaussian_aicc_bic_mixture)
@@ -389,18 +395,16 @@ class DeconvolvedSTData(RawSTData):
         plt.savefig('marker_gene_filtered.pdf')
         plt.close()
 
-    def save(self):
-        results_path = self.storage_path+'results/'
-        print('Saved to {}'.format(results_path))
-        if not os.path.isdir(results_path):
-            os.mkdir(results_path)
-        np.save(results_path+'cell_prob_trace.npy', self.cell_prob_trace)
-        np.save(results_path+'expression_trace.npy', self.expression_trace)
-        np.save(results_path+'beta_trace.npy', self.beta_trace)
-        np.save(results_path+'cell_num_trace.npy', self.cell_num_trace)
-        np.save(results_path+'lam.npy', np.array([self.lam]))
+    def save_deconvolved(self):
+        np.save(self.results_path+'cell_prob_trace.npy', self.cell_prob_trace)
+        np.save(self.results_path+'expression_trace.npy', self.expression_trace)
+        np.save(self.results_path+'beta_trace.npy', self.beta_trace)
+        np.save(self.results_path+'cell_num_trace.npy', self.cell_num_trace)
+        np.save(self.results_path+'lam.npy', np.array([self.lam]))
+        print('Saved to {}'.format(self.results_path))
 
     def load_deconvolved(self, load_path):
+        print('Loading deconvolution results from {}'.format(load_path))
         self.cell_prob_trace = np.load(load_path+'cell_prob_trace.npy')
         self.expression_trace = np.load(load_path+'expression_trace.npy')
         self.beta_trace = np.load(load_path+'beta_trace.npy')
@@ -532,6 +536,125 @@ cd $LS_SUBCWD
 python {2} --config {1}config_${{LSB_JOBINDEX}}.cfg
 """
         f.write(job.format(n_exp, cluster_storage+'config/{}/'.format(self.data_name), self.exc_file, self.results_path, cluster_storage+'outputs', self.data_name, time_limit, mem_req))
+
+class SpatialExpression(DeconvolvedSTData):
+    def __init__(self, load_path=None, stdata=None, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5):
+        super().__init__(load_path=stdata.results_path, stdata=stdata)
+        self.spatial_path = self.results_path+'spatial/'
+        if not os.path.isdir(self.spatial_path):
+            os.mkdir(self.spatial_path)
+        if load_path:
+            self.load_spatialexp(load_path)
+        else:
+            self.spatial_inference(n_spatial_patterns, n_samples, n_burn, n_thin)
+            self.save_spatialexp()
+
+    def spatial_inference(self, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5):
+        self.SDE = SpatialDifferentialExpression(n_cell_types=self.n_components, n_spatial_patterns=n_spatial_patterns, 
+                                                    Obs=self.Reads, edges=self.edges)
+        read_trace = np.load(self.results_path+'reads_trace.npy')
+        self.SDE.spatial_detection(self.cell_num_trace, self.beta_trace, self.expression_trace, read_trace, 
+                                    n_samples=n_samples, n_burn=n_burn, n_thin=n_thin, ncell_min=2, simple=False)
+
+    def save_spatialexp(self):
+        np.save(self.spatial_path+'W_samples', self.SDE.W_samples) 
+        np.save(self.spatial_path+'C_samples', self.SDE.C_samples) 
+        np.save(self.spatial_path+'Gamma_samples', self.SDE.Gamma_samples) 
+        np.save(self.spatial_path+'H_samples', self.SDE.H_samples) 
+        np.save(self.spatial_path+'V_samples', self.SDE.V_samples) 
+        np.save(self.spatial_path+'Theta_samples', self.SDE.Theta_samples)
+        print('Saved to {}'.format(self.spatial_path))
+
+    def load_spatialexp(self, load_path):
+        print('Loading spatial results from {}'.format(load_path))
+        self.W_samples = np.load(self.spatial_path+'W_samples.npy') 
+        self.C_samples = np.load(self.spatial_path+'C_samples.npy') 
+        self.Gamma_samples = np.load(self.spatial_path+'Gamma_samples.npy') 
+        self.H_samples = np.load(self.spatial_path+'H_samples.npy') 
+        self.V_samples = np.load(self.spatial_path+'V_samples.npy') 
+        self.Theta_samples = np.load(self.spatial_path+'Theta_samples.npy')
+
+    def spatial_genes(self, h_threshold=0.95, magnitude_filter=None):
+        score = (self.H_samples >0).mean(axis=0)
+        spatial_gene = []
+        for gene, cell_type in np.argwhere(score>0.95):
+            exp_gene = self.Theta_samples[:, :, gene, cell_type].mean(axis=0)
+            if magnitude_filter:
+                if exp_gene.max() - exp_gene.min() > magnitude_filter:
+                    spatial_gene.append([gene, cell_type])
+            else:
+                spatial_gene.append([gene, cell_type])
+        self.spatial_gene = np.array(spatial_gene)
+
+    def plot_spatial_patterns(self):
+        from matplotlib import colors
+        from scipy.stats import mode
+        from scipy.stats import pearsonr
+        spatial_plots_path = self.spatial_path+'plots/'
+        if not os.path.isdir(spatial_path):
+            os.mkdir(spatial_path)
+        cw_cmap = plt.get_cmap("coolwarm")
+        modes, counts = mode(self.H_samples, axis=0)
+        self.spatial_genes()
+        for k in range(self.n_components):
+            print('cell type {}'.format(k))
+            unique_genes = np.unique(self.spatial_gene[self.spatial_gene[:, 1]==k, 0])
+            patterns = np.unique(modes[0, :, k], axis=0)
+            patterns = patterns[patterns!=0]
+            if len(patterns) > 0:
+                f = 0
+                for h in patterns:
+                    gene_ids = np.argwhere(modes[0, unique_genes, k] == h)
+                    if len(gene_ids) != 0 and abs(pearsonr(self.cell_num_trace[:, :, k+1].mean(axis=0), 
+                                                            self.W_samples[:, k, h].mean(axis=0))[0]) < 0.5:
+                        f +=1
+                        loadings = self.V_samples[:, unique_genes[gene_ids], k].mean(axis=0).flatten()
+                        rank = loadings.argsort()
+                        gene_idx = unique_genes[gene_ids].flatten()[rank]
+                        genes = self.gene_names[gene_idx]
+                        n_genes = len(genes)
+                        print('\t {} spatial genes'.format(n_genes))
+                        loadings = self.V_samples[:, gene_idx, k].mean(axis=0)
+                        max_loading = np.max(np.abs(loadings)) * np.sign(loadings[np.argmax(np.abs(loadings))]) 
+                        loadings /= np.max(np.abs(loadings)) * np.sign(loadings[np.argmax(np.abs(loadings))]) 
+                        
+                        W_plot = self.W_samples[:, k, h].mean(axis=0) * max_loading
+                        vmin = min(-1e-4, W_plot.min())
+                        vmax = max(1e-4, W_plot.max())
+                        norm = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+                        print(np.std(W_plot))
+                        bp.st_plot(W_plot, pos[::-1], cmap='coolwarm', layout='s', norm=norm, unit_dist=10, 
+                                    name='spatial_pattern_cell_type_{}_{}'.format(k, f), save=spatial_plots_path)
+                        if n_genes > 15:
+                            genes_selected = np.argsort(np.abs(loadings))[::-1][:15]
+                            loadings = loadings[genes_selected]
+                            n_genes = 15
+                        fig, ax = plt.subplots(1, 1, figsize=(5, n_genes/2+1))
+                        loading_plot = loadings[np.argsort(loadings)]
+                        vmin = min(-1e-4, loading_plot.min())
+                        vmax = max(1e-4, loading_plot.max())
+                        norm = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+                        ax.barh(np.arange(n_genes), loading_plot, color=cw_cmap(norm(loading_plot)))
+                        for i, v in enumerate(loading_plot):
+                            if v > 0:
+                                ax.text(v, i, '{:.1f}'.format(v), fontweight = 'bold', ha='left', va='center')
+                            else:
+                                ax.text(v, i, '{:.1f}'.format(v), fontweight = 'bold', ha='right', va='center')
+                        ax.set_yticks(np.arange(n_genes))
+                        ax.set_yticklabels(genes[np.argsort(loadings)])
+                        ax.spines["top"].set_visible(False)
+                        ax.spines["right"].set_visible(False)
+                        ax.spines["left"].set_visible(False)
+                        ax.set_title('Loading', fontsize=20, fontweight='bold')
+                        ax.yaxis.tick_right()
+                        ax.set_xlim(-1.1, 1.1)
+                        plt.tight_layout()
+                        plt.savefig(self.spatial_plots_path+'spatial_loading_cell_type_{}_{}.pdf'.format(k, f))
+
+
+
+
+
 
 
 
