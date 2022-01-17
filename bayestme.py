@@ -207,8 +207,8 @@ class BayesTME:
         return DeconvolvedSTData(stdata=STData, cell_prob_trace=cell_prob_trace, expression_trace=expression_trace, beta_trace=beta_trace, cell_num_trace=cell_num_trace, lam=self.lam2)
 
 
-    def spatial_expression(self, DecovolvedData, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5):
+    def spatial_expression(self, DecovolvedData, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5, simple=False):
         return SpatialExpression(stdata=DecovolvedData, n_spatial_patterns=n_spatial_patterns, n_samples=n_samples, 
-                                    n_burn=n_burn, n_thin=n_thin)
+                                    n_burn=n_burn, n_thin=n_thin, simple=simple)
 
 

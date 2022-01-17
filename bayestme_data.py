@@ -538,7 +538,7 @@ python {2} --config {1}config_${{LSB_JOBINDEX}}.cfg
         f.write(job.format(n_exp, cluster_storage+'config/{}/'.format(self.data_name), self.exc_file, self.results_path, cluster_storage+'outputs', self.data_name, time_limit, mem_req))
 
 class SpatialExpression(DeconvolvedSTData):
-    def __init__(self, load_path=None, stdata=None, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5):
+    def __init__(self, load_path=None, stdata=None, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5, simple=False):
         super().__init__(load_path=stdata.results_path, stdata=stdata)
         self.spatial_path = self.results_path+'spatial/'
         if not os.path.isdir(self.spatial_path):
@@ -546,15 +546,15 @@ class SpatialExpression(DeconvolvedSTData):
         if load_path:
             self.load_spatialexp(load_path)
         else:
-            self.spatial_inference(n_spatial_patterns, n_samples, n_burn, n_thin)
+            self.spatial_inference(n_spatial_patterns, n_samples, n_burn, n_thin, simple)
             self.save_spatialexp()
 
-    def spatial_inference(self, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5):
+    def spatial_inference(self, n_spatial_patterns=10, n_samples=100, n_burn=100, n_thin=5, simple=False):
         self.SDE = SpatialDifferentialExpression(n_cell_types=self.n_components, n_spatial_patterns=n_spatial_patterns, 
                                                     Obs=self.Reads, edges=self.edges)
         read_trace = np.load(self.results_path+'reads_trace.npy')
         self.SDE.spatial_detection(self.cell_num_trace, self.beta_trace, self.expression_trace, read_trace, 
-                                    n_samples=n_samples, n_burn=n_burn, n_thin=n_thin, ncell_min=2, simple=False)
+                                    n_samples=n_samples, n_burn=n_burn, n_thin=n_thin, ncell_min=2, simple=simple)
 
     def save_spatialexp(self):
         np.save(self.spatial_path+'W_samples', self.SDE.W_samples) 
