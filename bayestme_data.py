@@ -117,6 +117,8 @@ class RawSTData:
                     self.filtering[filter_idx] = True
                 else:
                     self.selected_gene_idx = n_gene_filter
+                    if save:
+                        self.save()
                     return
             print('filtering out {} genes...'.format(filter_type))
 
@@ -231,8 +233,9 @@ class RawSTData:
             save = self.storage_path+'gene_bleeding_plots/'
             if not os.path.isdir(save):
                 os.mkdir(save)
-        bp.st_plot(plot_data, pos, unit_dist=size, cmap=cmap, layout=marker, x_y_swap=self.x_y_swap, invert=self.invert, v_min=v_min, v_max=v_max, subtitles=plot_titles, 
-                    name='{}_bleeding_plot'.format(self.gene_names[gene_idx]), save=save)
+        print(plot_data.shape)
+        bp.st_plot(plot_data[:, None], pos, unit_dist=size, cmap=cmap, layout=marker, x_y_swap=self.x_y_swap, invert=self.invert, v_min=v_min, 
+                   v_max=v_max, subtitles=plot_titles, name='{}_bleeding_plot'.format(self.gene_names[gene_idx]), save=save)
 
     def bleeding_correction(self, n_top=50, max_steps=5, n_gene=None):
         return CleanedSTData(stdata=self, n_top=n_top, max_steps=max_steps, n_gene=n_gene)
@@ -260,7 +263,7 @@ class CleanedSTData(RawSTData):
         basis_idxs, basis_mask = bleed.build_basis_indices(self.positions)
         self.global_rates, fit_Rates, self.basis_functions, self.Weights = bleed.decontaminate_spots(self.raw_Reads[:, :n_gene], self.tissue_mask, basis_idxs, basis_mask, n_top=n_top, max_steps=max_steps)
         self.corrected_Reads = np.round(fit_Rates / fit_Rates.sum(axis=0, keepdims=True) * self.raw_Reads[:, :n_gene].sum(axis=0, keepdims=True))
-        self.Reads = self.corrected_Reads[tissue_mask]
+        self.Reads = self.corrected_Reads[self.tissue_mask]
 
     def plot_basis_functions(self):
         basis_names = ['North', 'South', 'West', 'East']
@@ -456,7 +459,7 @@ class CrossValidationSTData(RawSTData):
         plt.savefig(self.k_fold_path+'{}_masks.pdf'.format(self.data_name))
         np.save(self.k_fold_data+'{}_pos'.format(self.data_name), self.positions_tissue)
 
-    def write_cgf(self, n_samples, n_burn, n_thin, cluster_storage, lda, spatial, folds=5, n_comp_min=2, n_comp_max=15, lams=[1, 1e1, 1e2, 1e3, 1e4, 1e5], max_ncell=120, n_genes=[1000]):
+    def write_cgf(self, n_samples, n_burn, n_thin, cluster_storage, lda, spatial, folds=5, n_comp_min=2, n_comp_max=12, lams=[1, 1e1, 1e2, 1e3, 1e4, 1e5], max_ncell=120, n_genes=[1000]):
         setup_path = self.k_fold_path + 'setup/'
         if not os.path.isdir(setup_path):
             os.mkdir(setup_path)

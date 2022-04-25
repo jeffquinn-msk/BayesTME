@@ -7,49 +7,63 @@ def st_plot(data, pos, cmap='BuPu', v_min=None, v_max=None, norm=None, layout='s
             name='st_plot', subtitles=None, fontsize=20, show=True, save=False):
     if x_y_swap:
         pos = pos[::-1]
-    if len(data.shape) > 1:
-        n_plots = data.shape[0]
-    else:
-        n_plots = 1
-        data = data[None]
+    n_plots = data.shape[0]
     if not isinstance(v_min, (list, np.ndarray)):
         v_min = [v_min for i in range(n_plots)]
     if not isinstance(v_max, (list, np.ndarray)):
         v_max = [v_max for i in range(n_plots)]
-    if not isinstance(subtitles, (list, np.ndarray)):
-        subtitles = [subtitles] + [None for i in range(n_plots-1)]
     subplots_adj = 1/n_plots
     x_axis_distance = pos[0].max() - pos[0].min() + 2
     y_axis_distance = pos[1].max() - pos[1].min() + 2
     dpi = plt.rcParams["figure.dpi"]
-    text_width = np.sqrt(plt.rcParams['ytick.labelsize']) 
-    text_ratio = text_width / (x_axis_distance*unit_dist + text_width)
-    st_ratio = (subplots_adj - (text_ratio+0.05)) / subplots_adj
+    text_width = plt.rcParams['ytick.labelsize'] * 2
+    # text_ratio = text_width / (x_axis_distance*unit_dist + text_width)
+    if layout == 'H' and invert[0]+invert[1]==1:
+        layout = 'h'
+        text_ratio = text_width / (x_axis_distance*unit_dist + text_width)
+        st_ratio = 1 - text_ratio-0.08
+    else:
+        text_ratio = text_width / (x_axis_distance*np.sqrt(3)*unit_dist + text_width)
+        st_ratio = 1 - text_ratio-0.1
+
+    if subtitles:
+        h = 0.78
+
+    else:
+        h = 1
+    h_cb_l = h * 0.03
     if layout == 's':
         scatter_size = unit_dist**2
         fig_width = (x_axis_distance*unit_dist / dpi) / st_ratio
-        fig_height = y_axis_distance*unit_dist / dpi
+        fig_height = y_axis_distance*unit_dist / dpi / h
     elif layout == 'H':
         scatter_size = (2*unit_dist)**2
         fig_width = x_axis_distance*np.sqrt(3)*unit_dist/dpi / st_ratio
-        fig_height = y_axis_distance*unit_dist/dpi
+        fig_height = y_axis_distance*unit_dist/dpi / h
+    elif layout == 'h':
+        scatter_size = (2*unit_dist)**2
+        fig_width = x_axis_distance*unit_dist/dpi / st_ratio
+        fig_height = y_axis_distance*np.sqrt(3)*unit_dist/dpi / h
     fig = plt.figure(figsize=(fig_width*n_plots, fig_height))
     for i in range(n_plots):
-        stbox = [0+i*subplots_adj, 0, st_ratio*subplots_adj, 1]
-        cbbox = [(st_ratio+0.01+i)*subplots_adj, 0.05, 0.04*subplots_adj, 0.9]
+        stbox = [0+i*subplots_adj, 0, st_ratio*subplots_adj, h]
+        cbbox = [(st_ratio+0.01+i)*subplots_adj, h_cb_l, 0.04*subplots_adj, h-h_cb_l*2]
         stframe = plt.axes(stbox)
         cbframe = plt.axes(cbbox)
-        img = stframe.scatter(pos[0], pos[1], c=data[i], cmap=cmap, s=scatter_size, vmin=v_min[i], vmax=v_max[i], norm=norm, marker=layout, linewidths=0)
+        img = stframe.scatter(pos[0], pos[1], c=data[i][0], cmap=cmap, s=scatter_size, vmin=v_min[i], vmax=v_max[i], norm=norm, marker=layout, linewidths=0)
+        if data[i].shape[0] > 1:
+            stframe.scatter(pos[0], pos[1], c=data[i][1], cmap=cmap, s=scatter_size, alpha=0.2, vmin=v_min[i], vmax=v_max[i], norm=norm, 
+                            marker=layout, linewidths=0)
+        plt.colorbar(img, cax=cbframe)
         stframe.set_xlim(pos[0].min()-1, pos[0].max()+1)
         stframe.set_ylim(pos[1].min()-1, pos[1].max()+1)
         stframe.axis('off')
-        if subtitles[i]:
-            stframe.set_title(subtitles[i])
+        if subtitles:
+            stframe.set_title(subtitles[i], fontweight='bold')
         if invert[0]:
             stframe.invert_xaxis()
         if invert[1]:
             stframe.invert_yaxis()
-        plt.colorbar(img, cax=cbframe)
     if save:
         print('Plot saved in {}'.format(save))
         plt.savefig(save+'{}.pdf'.format(name))
