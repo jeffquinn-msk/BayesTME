@@ -249,7 +249,7 @@ class CleanedSTData(RawSTData):
             self.load_cleaned(load_path)
         else:
             super().__init__(stdata.data_name, load=stdata.storage_path)
-            self.positions = np.load(self.storage_path+'all_spots_position.npy').T
+            self.positions = np.load(self.storage_path+'all_spots_position.npy').T.astype(int)
             self.raw_Reads = np.load(self.storage_path+'raw_count.npy')[:, self.selected_gene_idx]
             self.clean_bleed(n_top=n_top, max_steps=max_steps, n_gene=None)
             self.save()
@@ -260,7 +260,7 @@ class CleanedSTData(RawSTData):
     def clean_bleed(self, n_top=50, max_steps=5, n_gene=None):
         if not n_gene:
             n_gene = self.n_gene
-        basis_idxs, basis_mask = bleed.build_basis_indices(self.positions)
+        basis_idxs, basis_mask = bleed.build_basis_indices(self.positions, self.tissue_mask)
         self.global_rates, fit_Rates, self.basis_functions, self.Weights = bleed.decontaminate_spots(self.raw_Reads[:, :n_gene], self.tissue_mask, basis_idxs, basis_mask, n_top=n_top, max_steps=max_steps)
         self.corrected_Reads = np.round(fit_Rates / fit_Rates.sum(axis=0, keepdims=True) * self.raw_Reads[:, :n_gene].sum(axis=0, keepdims=True))
         self.Reads = self.corrected_Reads[self.tissue_mask]

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #BSUB -W 96:00
 #BSUB -R rusage[mem=24]
-#BSUB -J melanoma[1-420]
+#BSUB -J melanoma[1-330]
 #BSUB -e ../setup/outputs/melanoma_%I.err
 #BSUB -eo ../setup/outputs/melanoma_%I.out
 

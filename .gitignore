@@ -9,7 +9,11 @@ __pycache__/
 *.bbl
 *.blg
 *.fls
+*.ipynb
+*.npy
 .DS_Store
+*_data/
+*_results/
 plots/
 condor/
 data/
@@ -22,7 +26,6 @@ python/cell_counting
 python/plot
 pyhton/fig
 python/__pycache__
-python/*.ipynb
 python/checkpoint
 python/saved_model
 # C extensions

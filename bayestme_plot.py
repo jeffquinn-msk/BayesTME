@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 def st_plot(data, pos, cmap='BuPu', v_min=None, v_max=None, norm=None, layout='s', unit_dist=10, x_y_swap=False, invert=[0, 0], 
-            name='st_plot', subtitles=None, fontsize=20, show=True, save=False):
+            name='st_plot', colorbar=True, subtitles=None, fontsize=20, show=True, save=False):
     if x_y_swap:
         pos = pos[::-1]
     n_plots = data.shape[0]
@@ -49,12 +49,13 @@ def st_plot(data, pos, cmap='BuPu', v_min=None, v_max=None, norm=None, layout='s
         stbox = [0+i*subplots_adj, 0, st_ratio*subplots_adj, h]
         cbbox = [(st_ratio+0.01+i)*subplots_adj, h_cb_l, 0.04*subplots_adj, h-h_cb_l*2]
         stframe = plt.axes(stbox)
-        cbframe = plt.axes(cbbox)
         img = stframe.scatter(pos[0], pos[1], c=data[i][0], cmap=cmap, s=scatter_size, vmin=v_min[i], vmax=v_max[i], norm=norm, marker=layout, linewidths=0)
         if data[i].shape[0] > 1:
             stframe.scatter(pos[0], pos[1], c=data[i][1], cmap=cmap, s=scatter_size, alpha=0.2, vmin=v_min[i], vmax=v_max[i], norm=norm, 
                             marker=layout, linewidths=0)
-        plt.colorbar(img, cax=cbframe)
+        if colorbar:
+            cbframe = plt.axes(cbbox)
+            plt.colorbar(img, cax=cbframe)
         stframe.set_xlim(pos[0].min()-1, pos[0].max()+1)
         stframe.set_ylim(pos[1].min()-1, pos[1].max()+1)
         stframe.axis('off')
@@ -67,10 +68,10 @@ def st_plot(data, pos, cmap='BuPu', v_min=None, v_max=None, norm=None, layout='s
     if save:
         print('Plot saved in {}'.format(save))
         plt.savefig(save+'{}.pdf'.format(name))
-    if show:
-        plt.show()
+    else:
+        # plt.show()
         return fig
-    plt.close()
+    # plt.close()
 
 def plot_spots(ax, data, pos, rgb=np.array([1, 0, 0]), cmap=None, discrete_cmap=None, s=15, v_min=None, v_max=None, invert_x=True, invert_y=True, norm=None):
     if cmap is None and discrete_cmap is None:
