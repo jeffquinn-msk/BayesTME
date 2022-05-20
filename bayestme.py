@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from bayestme_data import RawSTData, CleanedSTData, DeconvolvedSTData, SpatialExpression
 import pandas as pd
 import scipy.io as io
+import os
 
 class BayesTME:
     def __init__(self, exp_name='BayesTME', storage_path=None):
@@ -170,6 +171,8 @@ class BayesTME:
         else:
             raise Exception('use cv to determine spatial smoothing parameter')
         results_path = self.storage_path+'results/'
+        if not os.path.isdir(results_path):
+            os.mkdir(results_path)
         print('experiment: {}, lambda {}, {} components'.format(self.exp_name, lam2, n_components))
         print('\t {} lda, {} layout, {} max cells, {}({}) gene'.format(lda, spatial, max_ncell, self.n_gene, n_gene))
         print('sampling: {} burn_in, {} samples, {} thinning'.format(n_burnin, n_samples, n_thin))

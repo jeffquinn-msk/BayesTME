@@ -368,9 +368,9 @@ class DeconvolvedSTData(RawSTData):
 
         if seperate_pdf:
             for i in range(self.n_components):
-                bp.st_plot(plot_object[i].T, self.positions_tissue, unit_dist=size, cmap=cmap, x_y_swap=self.x_y_swap, invert=self.invert)
+                bp.st_plot(plot_object[:, i].T[:, None], self.positions_tissue, unit_dist=size, cmap=cmap, x_y_swap=self.x_y_swap, invert=self.invert)
         else:
-            bp.st_plot(plot_object.T, self.positions_tissue, unit_dist=size, cmap=cmap, x_y_swap=self.x_y_swap, invert=self.invert)
+            bp.st_plot(plot_object.T[:, None], self.positions_tissue, unit_dist=size, cmap=cmap, x_y_swap=self.x_y_swap, invert=self.invert)
 
     def plot_marker_genes(self, n_top=5):
         gene_expression = self.expression_trace.mean(axis=0)
