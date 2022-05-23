@@ -4,10 +4,17 @@ from model_bkg import GraphFusedMultinomial
 from scipy.stats import multinomial
 import argparse
 import configparser
+import os
+import pathlib
+
 
 parser = argparse.ArgumentParser(description='GFMM modeling on st data')
 parser.add_argument('--config', type=str, default='semi_syn_1.cfg',
     help='configration file')
+parser.add_argument('--data-dir', type=str,
+    help='input data dir')
+parser.add_argument('--output-dir', type=str,
+    help='output data dir')
 
 args = parser.parse_args()
 
@@ -27,14 +34,14 @@ max_ncell = int(config['setup']['max_ncell'])
 n_gene_raw = int(config['exp']['n_gene'])
 storage_path = config['setup']['storage_path']
 
-pos_ss = np.load('data/{}_pos.npy'.format(exp_name))
-test = np.load('data/{}_test{}.npy'.format(exp_name, n_fold))
-train = np.load('data/{}_fold{}.npy'.format(exp_name, n_fold))
+pos_ss = np.load(os.path.join(args.data_dir, '{}_pos.npy'.format(exp_name)))
+test = np.load(os.path.join(args.data_dir, '{}_test{}.npy'.format(exp_name, n_fold)))
+train = np.load(os.path.join(args.data_dir,'{}_fold{}.npy'.format(exp_name, n_fold)))
 n_gene = min(train.shape[1], n_gene_raw)
 top = np.argsort(np.std(np.log(1+train), axis=0))[::-1]
 train = train[:, top[:n_gene]]
 test = test[:, top[:n_gene]]
-mask = np.load('data/{}_mask_fold{}.npy'.format(exp_name, n_fold))
+mask = np.load(os.path.join(args.data_dir, '{}_mask_fold{}.npy'.format(exp_name, n_fold)))
 if spatial == 0:
     edges = utils.get_edges(pos_ss, layout=2)
 else:
@@ -65,12 +72,15 @@ beta_trace = np.zeros((n_samples, n_components))
 # reads_trace = np.zeros((n_samples, n_nodes, n_gene, n_components))
 loglhtest_trace = np.zeros(n_samples)
 loglhtrain_trace = np.zeros(n_samples)
-np.save(storage_path+'{}_{}_{}_cell_prob_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), cell_prob_trace)
-np.save(storage_path+'{}_{}_{}_phi_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), expression_trace)
-np.save(storage_path+'{}_{}_{}_beta_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), beta_trace)
-np.save(storage_path+'{}_{}_{}_cell_num_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), cell_num_trace)
-np.save(storage_path+'likelihoods/{}_{}_{}_train_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), loglhtrain_trace)
-np.save(storage_path+'likelihoods/{}_{}_{}_test_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), loglhtest_trace)
+
+pathlib.Path(os.path.join(args.output_dir, 'likelihoods')).mkdir(parents=True, exist_ok=True)
+
+np.save(os.path.join(args.output_dir, '{}_{}_{}_cell_prob_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), cell_prob_trace)
+np.save(os.path.join(args.output_dir, '{}_{}_{}_phi_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), expression_trace)
+np.save(os.path.join(args.output_dir, '{}_{}_{}_beta_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), beta_trace)
+np.save(os.path.join(args.output_dir, '{}_{}_{}_cell_num_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), cell_num_trace)
+np.save(os.path.join(args.output_dir, 'likelihoods/{}_{}_{}_train_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), loglhtrain_trace)
+np.save(os.path.join(args.output_dir, 'likelihoods/{}_{}_{}_test_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), loglhtest_trace)
 for step in range(n_samples*n_thin+n_burn):
     if step % 10 == 0:
         print(f'Step {step}')
@@ -89,9 +99,9 @@ for step in range(n_samples*n_thin+n_burn):
         loglhtrain_trace[idx] = np.array([multinomial.logpmf(train[i], train[i].sum(), nb_probs[i]) for i in train_spots]).sum()
         print('{}, {}'.format(loglhtrain_trace[idx], loglhtest_trace[idx]))
 
-np.save(storage_path+'{}_{}_{}_cell_prob_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), cell_prob_trace)
-np.save(storage_path+'{}_{}_{}_phi_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), expression_trace)
-np.save(storage_path+'{}_{}_{}_beta_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), beta_trace)
-np.save(storage_path+'{}_{}_{}_cell_num_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), cell_num_trace)
-np.save(storage_path+'likelihoods/{}_{}_{}_train_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), loglhtrain_trace)
-np.save(storage_path+'likelihoods/{}_{}_{}_test_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold), loglhtest_trace)
+np.save(os.path.join(args.output_dir, '{}_{}_{}_cell_prob_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), cell_prob_trace)
+np.save(os.path.join(args.output_dir, '{}_{}_{}_phi_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), expression_trace)
+np.save(os.path.join(args.output_dir, '{}_{}_{}_beta_post_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), beta_trace)
+np.save(os.path.join(args.output_dir, '{}_{}_{}_cell_num_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), cell_num_trace)
+np.save(os.path.join(args.output_dir, 'likelihoods/{}_{}_{}_train_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), loglhtrain_trace)
+np.save(os.path.join(args.output_dir, 'likelihoods/{}_{}_{}_test_likelihood_{}_{}_{}.npy'.format(exp_name, n_gene_raw, max_ncell, n_components, lam_psi, n_fold)), loglhtest_trace)
