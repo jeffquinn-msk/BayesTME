@@ -30,3 +30,8 @@ python/checkpoint
 python/saved_model
 # C extensions
 *.so
+# Data
+*.zip
+A1_spaceranger_output
+zebrafish_A1_data
+.idea

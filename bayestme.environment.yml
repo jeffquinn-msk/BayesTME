@@ -1,0 +1,16 @@
+name: bayes_tme
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - python=3.9
+  - numpy=1.19.5
+  - seaborn=0.11.2
+  - scipy=1.8.0
+  - scikit-image=0.19.2
+  - scikit-learn=0.24.2
+  - scikit-sparse=0.4.5
+  - pypolyagamma=1.2.3
+  - matplotlib=3.4.3
+  - scipy=1.8.0
+  - pytorch=1.10.0
