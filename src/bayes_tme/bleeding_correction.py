@@ -3,10 +3,12 @@ Same as bleed_correction8.py except now we use separate basis functions for in-t
 The hope is that this enables us to account for tissue friction which seems to be an issue.
 '''
 import numpy as np
+from scipy.stats import multivariate_normal, multivariate_t
+
+from .utils import stable_softmax
 
 
 def generate_data(n_rows=30, n_cols=30, n_genes=20, spot_bleed_prob=0.5, bleeding='anisotropic'):
-    from scipy.stats import multivariate_normal, multivariate_t
     xygrid = np.meshgrid(np.arange(n_rows), np.arange(n_cols))
     locations = np.array([xygrid[0].reshape(-1), xygrid[1].reshape(-1)]).T
 
@@ -177,7 +179,6 @@ def softplus(x):
 
 
 def weights_from_basis(basis_functions, basis_idxs, basis_mask, tissue_mask, local_weight):
-    from utils import stable_softmax
     W = np.sum([basis_functions[d, basis_idxs[:, :, d]] * basis_mask[:, :, d] for d in range(basis_functions.shape[0])],
                axis=0)
     W[np.arange(tissue_mask.shape[0]), np.arange(tissue_mask.shape[0])] += local_weight * tissue_mask.astype(float)
