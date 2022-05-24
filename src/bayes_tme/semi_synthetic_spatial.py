@@ -6,11 +6,13 @@ import pandas as pd
 import anndata
 import statsmodels.api as sm
 
+
 def get_rank(array):
     temp = array.argsort()
     ranks = np.empty_like(temp)
     ranks[temp] = np.arange(len(array))
     return ranks
+
 
 def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
                             cell_type_toselect, n_genes, cell_num=None,
@@ -19,7 +21,7 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
                             n_spatial_gene=50, alpha=1, w=None,
                             spatial_gene=None, spatial_cell_type=None,
                             spatial_programs=None,
-                            verbose=True,**kwargs):
+                            verbose=True, **kwargs):
     if verbose:
         print('Generating semi-synthetic data...')
         if cell_num is not None:
@@ -48,7 +50,7 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
 
     # filter the top n_genes most expressed genes
     gene_count_mat = np.asarray(adata_snrna_raw.X[cell_type_filter].todense())
-    top = np.argsort(np.std(np.log(1+gene_count_mat), axis=0))[::-1]
+    top = np.argsort(np.std(np.log(1 + gene_count_mat), axis=0))[::-1]
     gene_count_mat = gene_count_mat[:, top[:n_genes]].astype(int)
 
     # filter the selected cells
@@ -61,11 +63,11 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
         bkg = layout
     else:
         bkg = np.zeros((canvas_size[0], canvas_size[1]), dtype=int)
-        n_row = int(canvas_size[0]/sq_size)
-        n_col = int(canvas_size[1]/sq_size)
+        n_row = int(canvas_size[0] / sq_size)
+        n_col = int(canvas_size[1] / sq_size)
         for i in range(n_row):
             for j in range(n_col):
-                bkg[i*sq_size:(i+1)*sq_size, j*sq_size:(j+1)*sq_size] = i*n_col+j
+                bkg[i * sq_size:(i + 1) * sq_size, j * sq_size:(j + 1) * sq_size] = i * n_col + j
 
     # assign celluar community indices to spots in tissue
     prior_idx = np.zeros(pos_ss.shape[1])
@@ -78,14 +80,14 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
 
     # generate synthetic cell type probilities
     n_components = len(cell_type_toselect)
-    priors = np.random.dirichlet(np.ones(n_components) * alpha, size=bkg.max()+1)
+    priors = np.random.dirichlet(np.ones(n_components) * alpha, size=bkg.max() + 1)
     priors /= priors.sum(axis=1, keepdims=True)
     Truth_prior = priors[prior_idx]
 
     n_nodes = pos_ss.shape[1]
     # get the true rate of total number of cells in each region
     # total num of cells in spot i ~ Pois(lambda_i)
-    lambdas = np.random.gamma(90, 1/3, 36)
+    lambdas = np.random.gamma(90, 1 / 3, 36)
     n_cells = np.zeros((n_nodes, n_components), dtype=int)
     for i in range(n_nodes):
         if i % 1000 == 0:
@@ -106,18 +108,18 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
         current_spot = 0
         for i in range(n_nodes):
             # assign each sampled cell to some spots
-            sampled_cells_spots_k[current_spot:current_spot+n_cells[i, k]] = i
+            sampled_cells_spots_k[current_spot:current_spot + n_cells[i, k]] = i
             current_spot += n_cells[i, k]
         sampled_cells.append(sampled_cells_k)
         sampled_cells_spots.append(sampled_cells_spots_k)
         sampled_cell_reads.append(gene_count_mat[sampled_cells_k])
 
-    if n_spatial_gene > 0 :
+    if n_spatial_gene > 0:
         if w is None:
             w = np.zeros((n_nodes, 3))
-            w[:, 0] = np.cos(1/4 * pos_ss[0]) * 10
-            w[:, 1] = np.sin(1/10 * pos_ss[1]) * 10
-            w[:, 2] = np.cos(1/600 * pos_ss[0] * pos_ss[1]) * 10
+            w[:, 0] = np.cos(1 / 4 * pos_ss[0]) * 10
+            w[:, 1] = np.sin(1 / 10 * pos_ss[1]) * 10
+            w[:, 2] = np.cos(1 / 600 * pos_ss[0] * pos_ss[1]) * 10
         n_spatial_programs = w.shape[1]
 
         if spatial_gene is None or spatial_cell_type is None:
@@ -125,7 +127,7 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
             alphas = np.zeros((n_genes, n_components))
             for k in range(n_components):
                 for i in range(n_genes):
-                    if (sampled_cell_reads[k][:, i] > 0).sum() > int(sampled_cell_reads[k].shape[0]/2):
+                    if (sampled_cell_reads[k][:, i] > 0).sum() > int(sampled_cell_reads[k].shape[0] / 2):
                         x = np.ones(sampled_cell_reads[k].shape[0])
                         res = sm.NegativeBinomial(sampled_cell_reads[k][:, i], x, loglike_method='nb2').fit()
                         alphas[i, k] = res.params[1]
@@ -139,7 +141,8 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
                 spatial_programs[i] = np.random.randint(n_spatial_programs)
 
         for i in range(n_spatial_gene):
-            expression_current_gene = np.random.normal(w[:, spatial_programs[i]][sampled_cells_spots[spatial_cell_type[i]]])
+            expression_current_gene = np.random.normal(
+                w[:, spatial_programs[i]][sampled_cells_spots[spatial_cell_type[i]]])
             expression_rank = get_rank(expression_current_gene)
 
             # reorder the sampled gene
@@ -153,14 +156,10 @@ def generate_semi_synthetic(snRNA_reads_path, snRNA_label_path, pos_ss,
     else:
         spatial = None
 
-
     Observation = np.zeros((n_nodes, n_genes, n_components))
     for i in range(n_nodes):
         for k in range(n_components):
             Observation[i, :, k] = sampled_cell_reads[k][sampled_cells_spots[k] == i].sum(axis=0)
     Observations_tissue = Observation.sum(axis=-1).astype(int)
 
-    
     return Observations_tissue, Observation, Truth_prior, n_cells, spatial, sampled_cell_reads
-
-

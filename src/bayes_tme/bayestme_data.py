@@ -1,14 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import bayestme_plot as bp
-import bleeding_correction as bleed
-from spatial_expression import SpatialDifferentialExpression
 import re
 import os
-import warnings
-from sklearn.model_selection import KFold
-import utils
+
 import configparser
+
+from sklearn.model_selection import KFold
+
+from . import utils
+from . import bleeding_correction as bleed
+from . import bayestme_plot as bp
+from .spatial_expression import SpatialDifferentialExpression
+
 
 class RawSTData:
     def __init__(self, data_name, load=None, raw_count=None, positions=None, tissue_mask=None, gene_names=None, layout=None, storage_path='./', 

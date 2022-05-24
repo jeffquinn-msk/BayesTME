@@ -5,34 +5,40 @@ def adjacency_matrix_from_edges(edges):
     from scipy.sparse import coo_matrix
     '''Takes an N x 2 numpy array of edges and converts to an adjacency matrix format.'''
     # Get the maximum node ID
-    n_nodes = np.max(edges)+1
+    n_nodes = np.max(edges) + 1
 
-    data = np.ones(n_nodes + edges.shape[0]*2)
-    rows = np.concatenate([np.arange(n_nodes), edges[:,0], edges[:,1]])
-    cols = np.concatenate([np.arange(n_nodes), edges[:,1], edges[:,0]])
+    data = np.ones(n_nodes + edges.shape[0] * 2)
+    rows = np.concatenate([np.arange(n_nodes), edges[:, 0], edges[:, 1]])
+    cols = np.concatenate([np.arange(n_nodes), edges[:, 1], edges[:, 0]])
     return coo_matrix((data, (rows, cols)), shape=(n_nodes, n_nodes))
+
 
 def gaussian_bic(posteriors, assignments, clusters):
     n_samples = assignments.shape[0]
     dof = clusters.shape[0]
-    sum_sqerr = ((posteriors.mean(axis=0) - clusters[assignments])**2).sum()
-    return dof*np.log(n_samples) + 2*sum_sqerr
+    sum_sqerr = ((posteriors.mean(axis=0) - clusters[assignments]) ** 2).sum()
+    return dof * np.log(n_samples) + 2 * sum_sqerr
+
 
 def gaussian_aicc(posteriors, assignments, clusters):
     n_samples = assignments.shape[0]
     dof = clusters.shape[0]
-    sum_sqerr = ((posteriors.mean(axis=0) - clusters[assignments])**2).sum()
-    return dof*2 + 2*sum_sqerr #+ (2*dof**2 + 2*dof) / (n_samples - dof - 1)
+    sum_sqerr = ((posteriors.mean(axis=0) - clusters[assignments]) ** 2).sum()
+    return dof * 2 + 2 * sum_sqerr  # + (2*dof**2 + 2*dof) / (n_samples - dof - 1)
+
 
 def gaussian_aicc_bic_mixture(posteriors, assignments, clusters, bic_proportion=0.5):
-    return gaussian_bic(posteriors, assignments, clusters)*bic_proportion + (1-bic_proportion)*gaussian_aicc(posteriors, assignments, clusters)
+    return gaussian_bic(posteriors, assignments, clusters) * bic_proportion + (1 - bic_proportion) * gaussian_aicc(
+        posteriors, assignments, clusters)
+
 
 def swap_labels(labels, perm):
     # Switch the labels appropriately
     temp = np.array(labels)
-    for i,k in enumerate(perm):
+    for i, k in enumerate(perm):
         temp[labels == i] = k
     return temp
+
 
 def exhaustive_best_permutation(source, target, n_clusters):
     from itertools import permutations
@@ -69,24 +75,25 @@ def greedy_best_permutation(source, target, n_clusters):
                 if j not in best_perm:
                     best_perm[i] = j
     return best_perm
-    
 
-def communities_from_posteriors_separate(posteriors, edges, n_clusters=None, min_clusters=1, max_clusters=7, cluster_score=gaussian_aicc_bic_mixture):
+
+def communities_from_posteriors_separate(posteriors, edges, n_clusters=None, min_clusters=1, max_clusters=7,
+                                         cluster_score=gaussian_aicc_bic_mixture):
     from sklearn.cluster import AgglomerativeClustering
     from scipy.stats import mode
 
     if n_clusters is None:
         # Choose the best cluster from a grid of options
         print(f'Choosing n clusters from {min_clusters} to {max_clusters}')
-        scores = np.zeros(max_clusters-min_clusters+1)
-        cluster_options = list(range(min_clusters, max_clusters+1))
+        scores = np.zeros(max_clusters - min_clusters + 1)
+        cluster_options = list(range(min_clusters, max_clusters + 1))
         best_score = None
         for k in cluster_options:
             print(k)
             clusters, assignments = communities_from_posteriors(posteriors, edges, n_clusters=k)
-            scores[k-min_clusters] = cluster_score(posteriors, assignments, clusters)
-            if best_score is None or scores[k-min_clusters] < best_score:
-                best_score = scores[k-min_clusters]
+            scores[k - min_clusters] = cluster_score(posteriors, assignments, clusters)
+            if best_score is None or scores[k - min_clusters] < best_score:
+                best_score = scores[k - min_clusters]
                 best_clusters = clusters
                 best_assignments = assignments
         print(scores)
@@ -105,15 +112,15 @@ def communities_from_posteriors_separate(posteriors, edges, n_clusters=None, min
     assignments[0] = ward.fit_predict(posteriors[0])
 
     # Now cluster subsequent samples while aligning them to prevent label switching
-    for t in range(1,posteriors.shape[0]):
+    for t in range(1, posteriors.shape[0]):
         assignments[t] = ward.fit_predict(posteriors[t])
-        
+
         if n_clusters < 9:
             # Try all permutations to see which one fits the best
-            best_perm = exhaustive_best_permutation(assignments[t], assignments[t-1], n_clusters)
+            best_perm = exhaustive_best_permutation(assignments[t], assignments[t - 1], n_clusters)
         else:
             # Greedy selection, starting with the largest cluster
-            best_perm = greedy_best_permutation(assignments[t], assignments[t-1], n_clusters)
+            best_perm = greedy_best_permutation(assignments[t], assignments[t - 1], n_clusters)
         best_assignments = swap_labels(assignments[t], best_perm)
 
         # Switch the labels appropriately
@@ -126,26 +133,28 @@ def communities_from_posteriors_separate(posteriors, edges, n_clusters=None, min
     map_assignments = ward.fit_predict(assignments.T)
 
     # Average the clusters to get the best centroids
-    clusters = np.array([posteriors[:,map_assignments == i].mean(axis=0).mean(axis=0) for i in range(n_clusters)])
+    clusters = np.array([posteriors[:, map_assignments == i].mean(axis=0).mean(axis=0) for i in range(n_clusters)])
 
     return clusters, map_assignments
 
-def communities_from_posteriors(posteriors, edges, n_clusters=None, min_clusters=1, max_clusters=20, cluster_score=gaussian_aicc_bic_mixture):
+
+def communities_from_posteriors(posteriors, edges, n_clusters=None, min_clusters=1, max_clusters=20,
+                                cluster_score=gaussian_aicc_bic_mixture):
     from sklearn.cluster import AgglomerativeClustering
     from scipy.stats import mode
 
     if n_clusters is None:
         # Choose the best cluster from a grid of options
         print(f'Choosing n clusters from {min_clusters} to {max_clusters}')
-        scores = np.zeros(max_clusters-min_clusters+1)
-        cluster_options = list(range(min_clusters, max_clusters+1))
+        scores = np.zeros(max_clusters - min_clusters + 1)
+        cluster_options = list(range(min_clusters, max_clusters + 1))
         best_score = None
         for k in cluster_options:
             print(k)
             clusters, assignments = communities_from_posteriors(posteriors, edges, n_clusters=k)
-            scores[k-min_clusters] = cluster_score(posteriors, assignments, clusters)
-            if best_score is None or scores[k-min_clusters] < best_score:
-                best_score = scores[k-min_clusters]
+            scores[k - min_clusters] = cluster_score(posteriors, assignments, clusters)
+            if best_score is None or scores[k - min_clusters] < best_score:
+                best_score = scores[k - min_clusters]
                 best_clusters = clusters
                 best_assignments = assignments
         print(scores)
@@ -155,16 +164,17 @@ def communities_from_posteriors(posteriors, edges, n_clusters=None, min_clusters
     adj = adjacency_matrix_from_edges(edges)
 
     # Flatten the posteriors into a single vector for each point
-    posteriors = np.transpose(posteriors, [1,0,2])
+    posteriors = np.transpose(posteriors, [1, 0, 2])
 
     # Cluster the points
     ward = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward', connectivity=adj)
     assignments = ward.fit_predict(posteriors.reshape(posteriors.shape[0], -1))
 
     # Average the clusters to get the best centroids
-    clusters = np.array([posteriors[assignments == i].mean(axis=(0,1)) for i in range(n_clusters)])
+    clusters = np.array([posteriors[assignments == i].mean(axis=(0, 1)) for i in range(n_clusters)])
 
     return clusters, assignments
+
 
 def align_clusters(assignments_ref, assignments):
     cluster_ref = []
@@ -203,38 +213,39 @@ def align_clusters(assignments_ref, assignments):
 
 def test_communities():
     np.random.seed(42)
-    
+
     # Build a 100x100 image to cluster
     from sklearn.feature_extraction.image import grid_to_graph
-    adj = grid_to_graph(*(100,100))
+    adj = grid_to_graph(*(100, 100))
     edges = np.where(adj.todense())
     edges = np.array([edges[0], edges[1]]).T
-    edges = edges[edges[:,0] < edges[:,1]] # Do not keep redundant edges [i.e. if (i,j) is in edges, (j,i) should not be.]
+    edges = edges[
+        edges[:, 0] < edges[:, 1]]  # Do not keep redundant edges [i.e. if (i,j) is in edges, (j,i) should not be.]
 
     n_samples = 3
     n_dims = 3
 
     # Setup a piecewise constant ground truth
-    truth = np.ones((100,100,n_dims)) / n_dims
+    truth = np.ones((100, 100, n_dims)) / n_dims
     truth_assignments = np.zeros(truth.shape[:-1], dtype=int)
     idx = 1
 
-    truth[25:40, 25:50] = np.random.dirichlet(np.ones(n_dims)) 
+    truth[25:40, 25:50] = np.random.dirichlet(np.ones(n_dims))
     truth_assignments[25:40, 25:50] = idx
     idx += 1
 
-    truth[5:15, 60:75] = np.random.dirichlet(np.ones(n_dims)) 
+    truth[5:15, 60:75] = np.random.dirichlet(np.ones(n_dims))
     truth_assignments[5:15, 60:75] = idx
     idx += 1
 
-    truth[80:95, 80:90] = np.random.dirichlet(np.ones(n_dims)) 
+    truth[80:95, 80:90] = np.random.dirichlet(np.ones(n_dims))
     truth_assignments[80:95, 80:90] = idx
     idx += 1
 
     # Sample some data
     flat_truth = truth.reshape(-1, n_dims)
-    posteriors = np.array([np.random.normal(flat_truth,0.15) for _ in range(n_samples)])
-    
+    posteriors = np.array([np.random.normal(flat_truth, 0.15) for _ in range(n_samples)])
+
     # Cluster the posterior samples
     clusters, assignments, scores = communities_from_posteriors(posteriors, edges)
     n_clusters_selected = len(np.unique(assignments))
@@ -256,7 +267,7 @@ def test_communities():
     colors = sns.color_palette('colorblind', n_colors=n_colors)
     random.shuffle(colors)
     cmap = matplotlib.colors.ListedColormap(colors)
-    fig, axarr = plt.subplots(1,3,figsize=(15,5),sharex=True,sharey=True)
+    fig, axarr = plt.subplots(1, 3, figsize=(15, 5), sharex=True, sharey=True)
     axarr[0].imshow(posteriors[0].reshape(truth.shape), interpolation='none')
     axarr[1].imshow(truth_assignments, cmap=cmap, vmin=0, vmax=n_colors, interpolation='none')
     axarr[2].imshow(assignments, cmap=cmap, vmin=0, vmax=n_colors, interpolation='none')
@@ -281,41 +292,42 @@ if __name__ == '__main__':
     plots_path = os.path.join(experiment_path, 'plots')
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
-    
+
     pos = np.load(os.path.join(experiment_path, 'pos.npy'))
     edges = np.load(os.path.join(experiment_path, 'edges.npy'))
     probs = np.load(os.path.join(posteriors_path, 'probs.npy'))[::10]
 
-    mask = edges[:,0] > edges[:,1]
-    edges[mask] = np.concatenate([edges[mask,1:2], edges[mask,0:1]], axis=1)
+    mask = edges[:, 0] > edges[:, 1]
+    edges[mask] = np.concatenate([edges[mask, 1:2], edges[mask, 0:1]], axis=1)
     print(probs.min(), probs.max())
 
     # Add the K=10 nearest-neighbors to the connectivity list to handle tissue gaps
     from sklearn.neighbors import NearestNeighbors
+
     nbrs = NearestNeighbors(n_neighbors=11, algorithm='ball_tree').fit(pos.T)
     distances, indices = nbrs.kneighbors(pos.T)
     neighbors = set()
-    for i, row in enumerate(indices[:,1:]):
+    for i, row in enumerate(indices[:, 1:]):
         for j in row:
-            neighbors.add((i,j))
-            neighbors.add((j,i))
+            neighbors.add((i, j))
+            neighbors.add((j, i))
     neighbors = np.array(list(neighbors))
-    neighbors = neighbors[neighbors[:,0] < neighbors[:,1]]
+    neighbors = neighbors[neighbors[:, 0] < neighbors[:, 1]]
     edges = np.concatenate([edges, neighbors], axis=0)
 
     # Cluster to find cellular communities
     print('Clustering posterior draws')
-    clusters, assignments, scores = communities_from_posteriors(probs, edges, min_clusters=1, max_clusters=50, cluster_score=gaussian_aicc_bic_mixture)
+    clusters, assignments, scores = communities_from_posteriors(probs, edges, min_clusters=1, max_clusters=50,
+                                                                cluster_score=gaussian_aicc_bic_mixture)
     print(f'Chose {clusters.shape[0]} clusters.')
 
-    fig, axarr = plt.subplots(1,1,figsize=(10,10))
+    fig, axarr = plt.subplots(1, 1, figsize=(10, 10))
 
     # Get the different colors for the clusters
     n_colors = np.unique(assignments).shape[0]
     colors = sns.color_palette('colorblind', n_colors=n_colors)
     random.shuffle(colors)
     cmap = matplotlib.colors.ListedColormap(colors)
-
 
     # plot_result(axarr[0], probs.mean(axis=0)[...,0], pos, v_max=None, v_min=None, c_map=None)
     plot_result(axarr, assignments, pos, v_max=None, v_min=None, c_map=cmap, boost=True)
@@ -326,7 +338,7 @@ if __name__ == '__main__':
     plt.savefig(os.path.join(plots_path, 'communities.pdf'), bbox_inches='tight')
     plt.close()
 
-    plt.plot(np.arange(1,scores.shape[0]+1), scores, lw=2, color='blue')
+    plt.plot(np.arange(1, scores.shape[0] + 1), scores, lw=2, color='blue')
     plt.scatter(np.argmin(scores) + 1, scores[np.argmin(scores)], color='orange')
     plt.xlabel('Number of clusters')
     plt.ylabel('Information criterion')

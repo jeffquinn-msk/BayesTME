@@ -1,4 +1,4 @@
-import bayestme
+from . import bayestme
 
 melanoma = bayestme.BayesTME(exp_name='melanoma')
 melanoma_stdata = melanoma.load_data_from_count_mat('data/ST_mel1_rep2_counts.tsv')

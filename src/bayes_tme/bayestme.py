@@ -1,12 +1,11 @@
 import numpy as np
-from model_bkg import GraphFusedMultinomial
-from scipy.stats import multinomial
-import utils
-import matplotlib.pyplot as plt
-from bayestme_data import RawSTData, CleanedSTData, DeconvolvedSTData, SpatialExpression
 import pandas as pd
 import scipy.io as io
 import os
+
+from . import utils
+from .model_bkg import GraphFusedMultinomial
+from .bayestme_data import RawSTData, DeconvolvedSTData, SpatialExpression
 
 class BayesTME:
     def __init__(self, exp_name='BayesTME', storage_path=None):

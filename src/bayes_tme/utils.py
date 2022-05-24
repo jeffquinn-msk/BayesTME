@@ -9,20 +9,22 @@ def hypercube_edges(dims, use_map=False):
     '''Create edge lists for an arbitrary hypercube. TODO: this is probably not the fastest way.'''
     edges = []
     nodes = np.arange(np.product(dims)).reshape(dims)
-    for i,d in enumerate(dims):
-        for j in range(d-1):
-            for n1, n2 in zip(np.take(nodes, [j], axis=i).flatten(), np.take(nodes,[j+1], axis=i).flatten()):
-                edges.append((n1,n2))
+    for i, d in enumerate(dims):
+        for j in range(d - 1):
+            for n1, n2 in zip(np.take(nodes, [j], axis=i).flatten(), np.take(nodes, [j + 1], axis=i).flatten()):
+                edges.append((n1, n2))
     if use_map:
         return edge_map_from_edge_list(edges)
     return edges
 
+
 def edge_map_from_edge_list(edges):
     result = defaultdict(list)
-    for s,t in edges:
+    for s, t in edges:
         result[s].append(t)
         result[t].append(s)
     return result
+
 
 def matrix_from_edges(edges):
     '''Returns a sparse penalty matrix (D) from a list of edge pairs. Each edge
@@ -36,20 +38,21 @@ def matrix_from_edges(edges):
         for i, neighbors in edges.items():
             for j in neighbors:
                 if i <= j:
-                    edge_list.append((i,j))
+                    edge_list.append((i, j))
         edges = edge_list
     for i, edge in enumerate(edges):
         s, t = edge[0], edge[1]
         weight = 1 if len(edge) == 2 else edge[2]
-        cols.append(min(s,t))
-        cols.append(max(s,t))
+        cols.append(min(s, t))
+        cols.append(max(s, t))
         rows.append(i)
         rows.append(i)
         vals.append(weight)
         vals.append(-weight)
         if cols[-1] > max_col:
             max_col = cols[-1]
-    return coo_matrix((vals, (rows, cols)), shape=(rows[-1]+1, max_col+1)).tocsc()
+    return coo_matrix((vals, (rows, cols)), shape=(rows[-1] + 1, max_col + 1)).tocsc()
+
 
 def get_delta(D, k):
     '''Calculate the k-th order trend filtering matrix given the oriented edge
@@ -61,21 +64,25 @@ def get_delta(D, k):
         result = D.T.dot(result) if i % 2 == 0 else D.dot(result)
     return result
 
+
 def grid_penalty_matrix(dims, k):
     edges = hypercube_edges(dims)
     D = matrix_from_edges(edges)
     return get_delta(D, k)
 
+
 def sample_horseshoe_plus(size=1):
-    a = 1/np.random.gamma(0.5, 1, size=size)
-    b = 1/np.random.gamma(0.5, a)
-    c = 1/np.random.gamma(0.5, b)
-    d = 1/np.random.gamma(0.5, c)
+    a = 1 / np.random.gamma(0.5, 1, size=size)
+    b = 1 / np.random.gamma(0.5, a)
+    c = 1 / np.random.gamma(0.5, b)
+    d = 1 / np.random.gamma(0.5, c)
     return d, c, b, a
 
+
 def sample_horseshoe(size=1):
-    a = 1/np.random.gamma(0.5, 1, size=size)
-    return 1/np.random.gamma(0.5, a), a
+    a = 1 / np.random.gamma(0.5, 1, size=size)
+    return 1 / np.random.gamma(0.5, a), a
+
 
 def sample_mvn_from_precision(Q, mu=None, mu_part=None, sparse=True, chol_factor=False, Q_shape=None):
     '''Fast sampling from a multivariate normal with precision parameterization.
@@ -116,17 +123,21 @@ def sample_mvn_from_precision(Q, mu=None, mu_part=None, sparse=True, chol_factor
         result += mu
     return result
 
+
 def ilogit(x):
-    return 1 / (1+np.exp(-x))
+    return 1 / (1 + np.exp(-x))
+
 
 def logit(x):
-    return np.log(x / (1-x))
+    return np.log(x / (1 - x))
+
 
 def sigmoid(x, inverse=False):
     if inverse:
-        return (1-x) / x
+        return (1 - x) / x
     else:
-        return x / (1-x)
+        return x / (1 - x)
+
 
 def stable_softmax(x, axis=-1):
     z = x - np.max(x, axis=axis, keepdims=True)
@@ -135,11 +146,12 @@ def stable_softmax(x, axis=-1):
     softmax = numerator / denominator
     return softmax
 
+
 def sample_horseshoe_plus(size=1):
-    a = 1/np.random.gamma(0.5, 1, size=size)
-    b = 1/np.random.gamma(0.5, a)
-    c = 1/np.random.gamma(0.5, b)
-    d = 1/np.random.gamma(0.5, c)
+    a = 1 / np.random.gamma(0.5, 1, size=size)
+    b = 1 / np.random.gamma(0.5, a)
+    c = 1 / np.random.gamma(0.5, b)
+    d = 1 / np.random.gamma(0.5, c)
     return d, c, b, a
 
 
@@ -148,14 +160,15 @@ def construct_edge_adjacency(neighbors):
     from scipy.sparse import csc_matrix
     data, rows, cols = [], [], []
     nrows = 0
-    for i,j in neighbors:
+    for i, j in neighbors:
         # if i < j:
-        data.extend([1,-1])
+        data.extend([1, -1])
         rows.extend([nrows, nrows])
-        cols.extend([i,j])
+        cols.extend([i, j])
         nrows += 1
     D = csc_matrix((data, (rows, cols)))
     return D
+
 
 def construct_trendfilter(D, t, eps=1e-4, sparse=False):
     '''Builds the t'th-order trend filtering matrix from an edge adjacency matrix.
@@ -174,13 +187,14 @@ def construct_trendfilter(D, t, eps=1e-4, sparse=False):
 
     # Add a small amount of independent noise to make the matrix full rank
     # Delta[np.arange(min(Delta.shape)), np.arange(min(Delta.shape))] += eps
-    
+
     if sparse:
         # Add a coordinate sparsity penalty
         extra = csc_matrix(np.eye(D.shape[1]))
     else:
         # Add a single independent node to make the matrix full rank
-        extra = csc_matrix((np.array([1.]), (np.array([0], dtype=int), np.array([0], dtype=int))), shape=(1,Delta.shape[1]))
+        extra = csc_matrix((np.array([1.]), (np.array([0], dtype=int), np.array([0], dtype=int))),
+                           shape=(1, Delta.shape[1]))
     Delta = vstack([Delta, extra])
     return Delta
 
@@ -190,14 +204,14 @@ def composite_trendfilter(D, K, anchor=0, sparse=False):
         Dbayes = np.eye(D.shape[1])
     else:
         # Start with the simple mu_1 ~ N(0, sigma)
-        Dbayes = np.zeros((1,D.shape[1]))
-        Dbayes[0,anchor] = 1
+        Dbayes = np.zeros((1, D.shape[1]))
+        Dbayes[0, anchor] = 1
 
     if issparse(D):
         Dbayes = csc_matrix(Dbayes)
 
     # Add in the k'th order diffs
-    for k in range(K+1):
+    for k in range(K + 1):
         Dk = get_delta(D, k=k)
         if issparse(Dbayes):
             Dbayes = vstack([Dbayes, Dk])
@@ -205,6 +219,7 @@ def composite_trendfilter(D, K, anchor=0, sparse=False):
             Dbayes = np.concatenate([Dbayes, Dk], axis=0)
 
     return Dbayes
+
 
 def multinomial_rvs(count, p):
     """
@@ -222,7 +237,7 @@ def multinomial_rvs(count, p):
     with np.errstate(divide='ignore', invalid='ignore'):
         condp = p / ps
     condp[np.isnan(condp)] = 0.0
-    for i in range(p.shape[-1]-1, 0, -1):
+    for i in range(p.shape[-1] - 1, 0, -1):
         binsample = np.random.binomial(count, condp[..., i])
         out[..., i] = binsample
         count -= binsample
@@ -231,7 +246,8 @@ def multinomial_rvs(count, p):
 
 
 def sigma(p):
-    return 1/(1 + np.exp(-p))
+    return 1 / (1 + np.exp(-p))
+
 
 def logp(beta, components, attr, obs):
     attribute = beta * attr
@@ -239,6 +255,7 @@ def logp(beta, components, attr, obs):
     lams = np.clip(lams.sum(axis=1), 1e-6, None)
     p = poisson.logpmf(obs, lams).sum()
     return p
+
 
 def log_likelihood(attrributes, n_cells, Obs):
     # attrributes = beta[:, None] * components          K by G
@@ -248,15 +265,17 @@ def log_likelihood(attrributes, n_cells, Obs):
     log_likelihood = poisson.logpmf(Obs, lams).sum()
     return log_likelihood
 
+
 def get_posmap(pos):
     ### get a matrix where the (i, j) entry stores the idx of the reads at spatial coordinates (i, j) on the tissue sample
     ### pos shape 2 by N
-    pos_map = np.empty((pos[0].max()+1, pos[1].max()+1))
+    pos_map = np.empty((pos[0].max() + 1, pos[1].max() + 1))
     pos_map[:, :] = np.nan
     for i in range(pos.shape[1]):
         x, y = pos[:, i]
         pos_map[x, y] = i
     return pos_map
+
 
 def get_edges(pos, layout=1):
     ### get edge graph from spot position and layout
@@ -274,12 +293,12 @@ def get_edges(pos, layout=1):
             for j in range(pos_map.shape[1]):
                 if ~np.isnan(pos_map[i, j]):
                     if i + 1 < pos_map.shape[0]:
-                        if j > 0 and ~np.isnan(pos_map[i+1, j-1]):
-                            edges.append(np.array([pos_map[i, j], pos_map[i+1, j-1]]))
-                        if j + 1 < pos_map.shape[1] and ~np.isnan(pos_map[i+1, j+1]):
-                            edges.append(np.array([pos_map[i, j], pos_map[i+1, j+1]]))
-                    if j + 2 < pos_map.shape[1] and ~np.isnan(pos_map[i, j+2]):
-                        edges.append(np.array([pos_map[i, j], pos_map[i, j+2]]))
+                        if j > 0 and ~np.isnan(pos_map[i + 1, j - 1]):
+                            edges.append(np.array([pos_map[i, j], pos_map[i + 1, j - 1]]))
+                        if j + 1 < pos_map.shape[1] and ~np.isnan(pos_map[i + 1, j + 1]):
+                            edges.append(np.array([pos_map[i, j], pos_map[i + 1, j + 1]]))
+                    if j + 2 < pos_map.shape[1] and ~np.isnan(pos_map[i, j + 2]):
+                        edges.append(np.array([pos_map[i, j], pos_map[i, j + 2]]))
     elif layout == 2:
         # current spot as '@' put edges between '@' and 'o's 
         # * * *
@@ -288,16 +307,17 @@ def get_edges(pos, layout=1):
         for i in range(pos_map.shape[0]):
             for j in range(pos_map.shape[1]):
                 if ~np.isnan(pos_map[i, j]):
-                    if i + 1 < pos_map.shape[0] and ~np.isnan(pos_map[i+1, j]):
-                        edges.append(np.array([pos_map[i, j], pos_map[i+1, j]]))
-                    if j + 1 < pos_map.shape[1] and ~np.isnan(pos_map[i, j+1]):
-                        edges.append(np.array([pos_map[i, j], pos_map[i, j+1]]))
+                    if i + 1 < pos_map.shape[0] and ~np.isnan(pos_map[i + 1, j]):
+                        edges.append(np.array([pos_map[i, j], pos_map[i + 1, j]]))
+                    if j + 1 < pos_map.shape[1] and ~np.isnan(pos_map[i, j + 1]):
+                        edges.append(np.array([pos_map[i, j], pos_map[i, j + 1]]))
     else:
         raise Exception('Unknown layout')
 
     edges = np.array(edges)
     edges = edges.astype(int)
     return edges
+
 
 def DIC(cell_post, beta_post, components_post, cell_attributes_post, Observations_tissue, idx):
     N = 0
@@ -309,23 +329,24 @@ def DIC(cell_post, beta_post, components_post, cell_attributes_post, Observation
             N += 1
     dic /= N
     dic *= 2
-    dic -= -2 * logp(cell_post[-idx].mean(axis=0), beta_post[-idx].mean(axis=0), components_post[-idx].mean(axis=0).T, cell_attributes_post[-idx].mean(axis=0), Observations_tissue)
+    dic -= -2 * logp(cell_post[-idx].mean(axis=0), beta_post[-idx].mean(axis=0), components_post[-idx].mean(axis=0).T,
+                     cell_attributes_post[-idx].mean(axis=0), Observations_tissue)
     return dic
+
 
 def get_WAIC(beta, components, attr, obs, idx):
     attribute = beta_trace[-idx, None] * cell_assignment_num_trace[-idx]
     lams = attribute[:, :, :, None] * gene_expression_trace[-idx, None]
     lams = np.clip(lams.sum(axis=2), 1e-6, None)
-    #lppd
+    # lppd
     pd = np.clip(poisson.pmf(Observation[None], lams), 1e-6, None)
     pd_mean = pd.mean(axis=0)
     lppd = np.log(pd_mean).sum()
     # p_waic
     loglikelihood = np.log(pd)
     mean_ll = loglikelihood.mean(axis=0)
-    v_s = ((loglikelihood - mean_ll[None, :])**2).sum(axis=0)/(loglikelihood.shape[0]-1)
+    v_s = ((loglikelihood - mean_ll[None, :]) ** 2).sum(axis=0) / (loglikelihood.shape[0] - 1)
     p_waic = v_s.sum()
     # scale by -2 (Gelman et al. 2013)
-    waic = -2*(lppd - p_waic)
+    waic = -2 * (lppd - p_waic)
     return waic
-
