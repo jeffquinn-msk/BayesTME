@@ -1,0 +1,6 @@
+docker_image: "jeffquinnmsk/bayes_tme:latest"
+raw_data:
+  class: File
+  path: /Users/jquinn/Code/hurazh/BayesTME/data/ST_mel1_rep2_counts.tsv
+filter_type: spots
+n_gene: "1000"
