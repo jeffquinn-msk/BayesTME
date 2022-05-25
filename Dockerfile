@@ -15,4 +15,6 @@ COPY tox.ini pyproject.toml setup.py setup.cfg LICENSE.txt README.md /app/
 
 RUN cd /app && python setup.py install
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app

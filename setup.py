@@ -27,7 +27,8 @@ setup(
             "grid_search=bayes_tme.grid_search_cfg:main",
             "filter_bleed=bayes_tme.bayestme_filter_bleed:main",
             "deconvolve=bayes_tme.bayestme_deconvolve:main",
-            "spatial_expression=bayes_tme.bayestme_spatial_expression:main"
+            "spatial_expression=bayes_tme.bayestme_spatial_expression:main",
+            "prepare_kfold=bayes_tme.bayestme_prepare_kfold:main"
         ],
     },
     python_requires=">=3.7, <4",
