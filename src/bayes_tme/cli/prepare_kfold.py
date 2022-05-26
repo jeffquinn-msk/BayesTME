@@ -1,5 +1,5 @@
 import argparse
-from . import bayestme
+from bayes_tme import bayestme
 
 parser = argparse.ArgumentParser(description='Deconvolve data')
 parser.add_argument('--data-dir', type=str,

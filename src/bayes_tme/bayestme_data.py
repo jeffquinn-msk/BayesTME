@@ -269,7 +269,7 @@ class CleanedSTData(RawSTData):
         if not n_gene:
             n_gene = self.n_gene
         basis_idxs, basis_mask = bleed.build_basis_indices(self.positions, self.tissue_mask)
-        self.global_rates, fit_Rates, self.basis_functions, self.Weights = bleed.decontaminate_spots(
+        self.global_rates, fit_Rates, self.basis_functions, self.Weights, _, _ = bleed.decontaminate_spots(
             self.raw_Reads[:, :n_gene], self.tissue_mask, basis_idxs, basis_mask, n_top=n_top, max_steps=max_steps)
         self.corrected_Reads = np.round(
             fit_Rates / fit_Rates.sum(axis=0, keepdims=True) * self.raw_Reads[:, :n_gene].sum(axis=0, keepdims=True))

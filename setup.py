@@ -25,26 +25,26 @@ setup(
     entry_points={  # Optional
         "console_scripts": [
             "grid_search=bayes_tme.grid_search_cfg:main",
-            "filter_bleed=bayes_tme.bayestme_filter_bleed:main",
-            "deconvolve=bayes_tme.bayestme_deconvolve:main",
-            "spatial_expression=bayes_tme.bayestme_spatial_expression:main",
-            "prepare_kfold=bayes_tme.bayestme_prepare_kfold:main"
+            "filter_bleed=bayes_tme.cli.filter_bleed:main",
+            "deconvolve=bayes_tme.cli.deconvolve:main",
+            "spatial_expression=bayes_tme.cli.spatial_expression:main",
+            "prepare_kfold=bayes_tme.cli.prepare_kfold:main"
         ],
     },
     python_requires=">=3.7, <4",
     install_requires=[
-        "numpy==1.22.3",
-        "seaborn==0.11.2",
-        "scipy==1.8.1",
-        "scikit-image==0.19.2",
-        "scikit-learn==1.1.1",
-        "pypolyagamma==1.2.3",
-        "matplotlib==3.4.3",
-        "autograd-minimize==0.2.2",
-        "scikit-sparse==0.4.6",
-        "torch==1.11.0",
-        "torchaudio==0.11.0",
-        "torchvision==0.12.0"
+        "numpy>=1.22.4",
+        "seaborn>=0.11.2",
+        "scipy>=1.7",
+        "scikit-image>=0.19.2",
+        "scikit-learn>=1.1.1",
+        "pypolyagamma>=1.2.3",
+        "matplotlib>=3.5",
+        "autograd-minimize>=0.2.2",
+        "scikit-sparse>=0.4.6",
+        "torch>=1.11.0",
+        "torchaudio>=0.11.0",
+        "torchvision>=0.12.0"
     ],
     extras_require={
         "dev": [
